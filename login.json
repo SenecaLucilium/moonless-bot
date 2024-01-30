@@ -1,0 +1,14 @@
+{
+    "mongoDB": {
+        "login": "login",
+        "password": "password",
+        "ip": "127.0.0.1",
+        "port": "27001"
+    },
+    "FilesDB": {
+        "article_path": "C:\\Program Files (x86)"
+    },
+    "TelegramAuth": {
+        "token": "token"
+    }
+}
