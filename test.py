@@ -1,4 +1,11 @@
-from BackEnd.database import Database
+from BackEnd.telegraph import createTelegraph
+from BackEnd.telegraph import getArticleHTML, formatArticle
 
-db = Database ()
-print (db.getArticleInfo(1)['name'])
+from ProjectSettings.paths import Paths
+from BackEnd.leafFunctions.files import readJson
+
+# print (readJson(Paths.loginJSON)['FilesDB']['article_path'])
+
+teleDict = createTelegraph (3)['telegraph']
+for i in teleDict:
+    print (i['url'])

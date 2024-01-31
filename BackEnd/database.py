@@ -23,5 +23,11 @@ class Database ():
             return None
 
     def getArticleInfo (self, id):
-        collection = self.client ["Moonless"]["testCollection"]
+        '''Получает информацию о статье по id.'''
+        collection = self.client ["Moonless"]["ArticlesMeta"]
+        return collection.find_one ({"id": id})
+
+    def getAuthorInfo (self, id):
+        '''Получает информацию об авторе по id.'''
+        collection = self.client ["Moonless"]["AuthorsMeta"]
         return collection.find_one ({"id": id})
