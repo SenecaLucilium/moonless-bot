@@ -11,10 +11,20 @@ from telegram.ext import (
 
 from ProjectSettings.paths import Paths
 from BackEnd.leafFunctions.files import readJson
+from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, prepareListSplit
 from BackEnd.database import Database
+from BackEnd.telegraph import createTelegraph
 
 class BotAPI ():
     def __init__ (self):
+        self.database = Database ()
+        self.currentFilters = {
+            'authors': [],
+            'tags': [],
+            'country': []
+        }
+        self.lastArticle = None
+    
         self.application = ApplicationBuilder().token(readJson(Paths.loginJSON)["TelegramAuth"]["token"]).build()
 
         startHandler = CommandHandler ('start', self.start)
@@ -30,32 +40,30 @@ class BotAPI ():
             },
             fallbacks=[CommandHandler("catalog", self.catalog)]
         )
-        filterConvHandler = ConversationHandler(
-            entry_points=[CommandHandler("filters", self.filters)],
+        filtersHandler = CommandHandler ('filters', self.filters)
+        articleHandler = ConversationHandler(
+            entry_points=[CommandHandler ('article', self.article)],
             states={
-                0: [
-                    CallbackQueryHandler (self.filtersOver, pattern="^" + "final" + "$"),
-                    CallbackQueryHandler (self.filtersAuthor, pattern="^" + "author" + "$"),
-                    CallbackQueryHandler (self.filtersTags, pattern="^" + "tags" + "$"),
-                    CallbackQueryHandler (self.filtersCountry, pattern="^" + "country" + "$"),
-                ]
+                0: [CallbackQueryHandler (self.telegraph, pattern="^" + "telegraph" + "$")]
             },
-            fallbacks=[CommandHandler("filters", self.filters)]
+            fallbacks=[CommandHandler ('article', self.article)]
         )
+        authorHandler = CommandHandler ('author', self.author)
+        filterAuthorsHandler = CommandHandler ('filterAuthors', self.filterAuthors)
+        filterTagsHandler = CommandHandler ('filterTags', self.filterTags)
+        filterCountryHandler = CommandHandler ('filterCountry', self.filterCountry)
         uknownHandler = MessageHandler (filters.COMMAND, self.unknown)
 
         self.application.add_handler (startHandler)
         self.application.add_handler (helpHandler)
         self.application.add_handler (catalogConvHandler)
-        self.application.add_handler (filterConvHandler)
+        self.application.add_handler (filtersHandler)
+        self.application.add_handler (articleHandler)
+        self.application.add_handler (authorHandler)
+        self.application.add_handler (filterAuthorsHandler)
+        self.application.add_handler (filterTagsHandler)
+        self.application.add_handler (filterCountryHandler)
         self.application.add_handler (uknownHandler)
-
-        self.database = Database ()
-        self.currentFilters = {
-            'author': [],
-            'tags': [],
-            'country': []
-        }
 
         self.application.run_polling (allowed_updates=Update.ALL_TYPES)
 
@@ -79,7 +87,7 @@ class BotAPI ():
             "\n"
             "Бот возвращает статьи в телеграфах (telegra.ph).\n"
             "\n"
-            "Основные команды:\n"
+            "<b>Основные команды:</b>\n"
             "/start - запуск бота\n"
             "/help - помощь и полный список команд\n"
             "/catalog - каталог статей\n"
@@ -87,7 +95,8 @@ class BotAPI ():
         )
         await context.bot.sendMessage (
             chat_id=update.effective_chat.id,
-            text=msg
+            text=msg,
+            parse_mode='html'
         )
 
     @staticmethod
@@ -104,7 +113,10 @@ class BotAPI ():
             "/author [id] - получить автора по его id\n"
             "/report [message] - сообщить об ошибке\n"
             "/logs - получить логи своего взаимодействия с ботом\n"
-            "/credentials - информация о проекте"
+            "/credentials - информация о проекте\n"
+            "/filterAuthors - \n"
+            "/filterTags - \n"
+            "/filterCountries - \n"
         )
         await context.bot.sendMessage (
             chat_id=update.effective_chat.id,
@@ -175,11 +187,11 @@ class BotAPI ():
         )
         return 0
 
-    def createFilterMsg (self) -> str:
-        '''Возвращает строку с текущими настройками фильтра.'''
+    async def filters (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Показывает окно фильтра.'''
 
         authorsTmp = ""
-        for author in self.currentFilters['author']:
+        for author in self.currentFilters['authors']:
             authorsTmp += f"{author}, "
         if authorsTmp != "":
             authorsTmp = authorsTmp[:-2]
@@ -197,120 +209,190 @@ class BotAPI ():
             countryTmp = countryTmp[:-2]
         
         msg = (
-            f"Текущий фильтр:\n"
+            "Текущий фильтр:\n\n"
             f"Авторы: [{authorsTmp}]\n"
             f"Теги: [{tagsTmp}]\n"
-            f"Страны: [{countryTmp}]\n"
+            f"Страны: [{countryTmp}]\n\n"
+            "Введите команду /filterAuthors [authors] чтобы добавить/убрать авторов из фильтра.\n"
+            "Введите команду /filterTags [tags] чтобы добавить/убрать теги из фильтра.\n"
+            "Введите команду /filterCountry [countries] чтобы добавить/убрать страны из фильтра.\n\n"
+            "При пустом фильтре будут отображаться все статьи."
         )
-
-        return msg
-
-    async def filters (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Показывает окно фильтра.'''
-        msg = self.createFilterMsg ()
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Редактировать", callback_data="author")
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.sendMessage (
             chat_id=update.effective_chat.id,
-            text=msg,
-            reply_markup=reply_markup
+            text=msg
         )
 
-        return 0
+    async def filterAuthors (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Добавляет или удаляет автора из фильтра.'''
+        if len (context.args) == 0:
+            msg = (
+                "Полный список авторов:\n"
+                f"{prepareListSplit (self.database.getAllAuthors())}"
+            )
+            await update.effective_message.reply_text (msg)
+        else:
+            added_args = []
+            denied_args = []
+
+            for arg in context.args:
+                if self.database.getAuthorInfo (arg) is None:
+                    denied_args.append (arg)
+                else:
+                    added_args.append (arg)
+            
+            tempSet = set(self.currentFilters['authors'])
+            tempSet.update (added_args)
+            self.currentFilters['authors'] = list (tempSet)
+
+            msg = (
+                f"Принятые аргументы: {prepareListString(added_args)}\n"
+                f"Не принятые аргументы: {prepareListString(denied_args)}\n"
+                f"Текущий фильтр авторов: {prepareListString(self.currentFilters['authors'])}"
+            )
+            await update.effective_message.reply_text (msg)
+
+    async def filterTags (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Добавляет или удаляет тег из фильтра.'''
+        if len (context.args) == 0:
+            msg = (
+                "Полный список тегов:\n"
+                f"{prepareListSplit (self.database.getAllTags())}"
+            )
+            await update.effective_message.reply_text (msg)
+        else:
+            added_args = []
+            denied_args = []
+
+            for arg in context.args:
+                if (arg in self.database.getAllTags()) == False:
+                    denied_args.append (arg)
+                else:
+                    added_args.append (arg)
+            
+            tempSet = set(self.currentFilters['tags'])
+            tempSet.update (added_args)
+            self.currentFilters['tags'] = list (tempSet)
+
+            msg = (
+                f"Принятые аргументы: {prepareListString(added_args)}\n"
+                f"Не принятые аргументы: {prepareListString(denied_args)}\n"
+                f"Текущий фильтр тегов: {prepareListString(self.currentFilters['tags'])}"
+            )
+            await update.effective_message.reply_text (msg)
+
+    async def filterCountry (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Добавляет или удаляет страну из фильтра.'''
+        if len (context.args) == 0:
+            msg = (
+                "Полный список стран:\n"
+                f"{prepareListSplit (self.database.getAllCountries())}"
+            )
+            await update.effective_message.reply_text (msg)
+        else:
+            added_args = []
+            denied_args = []
+
+            for arg in context.args:
+                if (arg in self.database.getAllCountries()) == False:
+                    denied_args.append (arg)
+                else:
+                    added_args.append (arg)
+            
+            tempSet = set(self.currentFilters['country'])
+            tempSet.update (added_args)
+            self.currentFilters['country'] = list (tempSet)
+
+            msg = (
+                f"Принятые аргументы: {prepareListString(added_args)}\n"
+                f"Не принятые аргументы: {prepareListString(denied_args)}\n"
+                f"Текущий фильтр стран: {prepareListString(self.currentFilters['country'])}"
+            )
+            await update.effective_message.reply_text (msg)
+
+    async def author (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Выдает информацию об авторе по id.'''
+        try:
+            if len (context.args) != 1:
+                raise ValueError
+            
+            authorInfo = self.database.getAuthorInfo (context.args[0])
+            if authorInfo is None:
+                raise MemoryError
+
+            msg = (
+                f"<b>ID:</b> {authorInfo['id']}\n"
+                f"<b>Имя:</b> {authorInfo['name']}\n"
+                f"<b>Основной ресурс:</b> {authorInfo['mainLink']}\n"
+                f"<b>Доп. ресурс:</b> {authorInfo['otherLink']}\n"
+            )
+            await update.effective_message.reply_text (msg, parse_mode='html')
+
+        except (IndexError, ValueError) as error:
+            print (f"author func error: {error}")
+            await update.effective_message.reply_text ("Корректное использование: /author [id].")
+        
+        except MemoryError as error:
+            print (f"author func error: {error}")
+            await update.effective_message.reply_text ("Не существует статьи с таким id.")
+
+    async def article (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Выдает информацию о статье по id.'''
+        try:
+            if len (context.args) != 1:
+                raise ValueError
+            
+            articleInfo = self.database.getArticleInfo (int (context.args[0]))
+            if articleInfo is None:
+                raise MemoryError
+            
+            self.database.updateViewsArticle (articleInfo['id'])
+            self.lastArticle = articleInfo['id']
+            msg = (
+                f"<b>ID:</b> {articleInfo['id']}\n"
+                f"<b>Название:</b> {articleInfo['name']}\n\n"
+                f"<b>Автор:</b> {articleInfo['realName']}\n"
+                f"<b>Теги:</b> {prepareListString (articleInfo['tags'])}\n"
+                f"<b>Страны:</b> {prepareListString (articleInfo['country'])}\n\n"
+                f"<b>Дата:</b> {articleInfo['date']}\n"
+                f"<b>Просмотры:</b> {articleInfo['views']}\n"
+            )
+
+            keyboard = [
+                [InlineKeyboardButton ("Получить телеграф", callback_data='telegraph')]
+            ]
+            reply_markup = InlineKeyboardMarkup (keyboard)
+
+            await update.effective_message.reply_text (msg, parse_mode='html', reply_markup=reply_markup)
+            return 0
+
+        except (IndexError, ValueError) as error:
+            print (f"article func error: {error}")
+            await update.effective_message.reply_text ("Корректное использование: /article [id].")
+        
+        except MemoryError as error:
+            print (f"article func error: {error}")
+            await update.effective_message.reply_text ("Не существует статьи с таким id.")
     
-    async def filtersOver (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Показывает окно фильтра, но не создает новое окно.'''
-        query = update.callback_query
-        await query.answer()
+    async def telegraph (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Возвращает ссылки на телеграф.'''
+        try:
+            await update.callback_query.answer()
+            
+            if self.lastArticle is None:
+                raise Exception
+            
+            telegraphList = createTelegraph(self.lastArticle)['telegraph']
+            msg = (
+                "Полученная статья:\n"
+                f"{prepareListUrls (telegraphList)}"
+            )
 
-        msg = self.createFilterMsg ()
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Редактировать", callback_data="author")
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text (
-            text=msg,
-            reply_markup=reply_markup
-        )
-
-        return 0
-    
-    async def filtersAuthor (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Показывает окно с списком авторов для фильтра.'''
-        query = update.callback_query
-        await query.answer()
-
-        msg = "Авторы из датабазы."
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Закончить", callback_data="final"),
-                InlineKeyboardButton("Далее", callback_data="tags")
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text (
-            text=msg,
-            reply_markup=reply_markup
-        )
-
-        return 0
-
-    async def filtersTags (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Показывает окно с списком тегов для фильтра.'''
-        query = update.callback_query
-        await query.answer()
-
-        msg = "Теги из датабазы."
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Закончить", callback_data="final"),
-                InlineKeyboardButton("Далее", callback_data="country")
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text (
-            text=msg,
-            reply_markup=reply_markup
-        )
-
-        return 0
-
-    async def filtersCountry (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Показывает окно с списком стран для фильтра.'''
-        query = update.callback_query
-        await query.answer()
-
-        msg = "Страны из датабазы."
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Закончить", callback_data="final")
-            ]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.edit_message_text (
-            text=msg,
-            reply_markup=reply_markup
-        )
-
-        return 0
+            await context.bot.sendMessage (
+                chat_id=update.effective_chat.id,
+                text=msg
+            )
+        except Exception as error:
+            print (f"telegraph func error: {error}")
+            await update.effective_chat.reply_text ("Произошла ошибка.")
