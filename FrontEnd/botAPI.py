@@ -11,15 +11,15 @@ from telegram.ext import (
 
 from ProjectSettings.paths import Paths
 from BackEnd.leafFunctions.files import readJson
-from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, prepareListSplit, prepareCatalogPage
+from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, prepareListSplit, prepareCatalogPage, prepareAuthors
 from BackEnd.database import Database
 from BackEnd.telegraph import createTelegraph
 
 CATALOG_KEYBOARD = {
     'back': InlineKeyboardButton ('Назад', callback_data='back'),
     'forward': InlineKeyboardButton ('Вперёд', callback_data='forward'),
-    'views': InlineKeyboardButton ('Просмотры', callback_data='views'),
-    'time': InlineKeyboardButton ('Время', callback_data='time')
+    'views': InlineKeyboardButton ('Просмотры', callback_data='sort'),
+    'time': InlineKeyboardButton ('Время', callback_data='sort')
 }
 
 class BotAPI ():
@@ -44,11 +44,13 @@ class BotAPI ():
             states={
                 0: [
                     CallbackQueryHandler (self.catalogBack, pattern="^" + "back" + "$"),
-                    CallbackQueryHandler (self.catalogForward, pattern="^" + "forward" + "$")
+                    CallbackQueryHandler (self.catalogForward, pattern="^" + "forward" + "$"),
+                    CallbackQueryHandler (self.catalogSort, pattern="^" + "sort" + "$")
                 ]
             },
             fallbacks=[CommandHandler("catalog", self.catalog)]
         )
+        authorsHandler = CommandHandler ('authors', self.authors)
         filtersHandler = CommandHandler ('filters', self.filters)
         articleHandler = ConversationHandler(
             entry_points=[CommandHandler ('article', self.article)],
@@ -66,6 +68,7 @@ class BotAPI ():
         self.application.add_handler (startHandler)
         self.application.add_handler (helpHandler)
         self.application.add_handler (catalogConvHandler)
+        self.application.add_handler (authorsHandler)
         self.application.add_handler (filtersHandler)
         self.application.add_handler (articleHandler)
         self.application.add_handler (authorHandler)
@@ -100,7 +103,7 @@ class BotAPI ():
             "/start - запуск бота\n"
             "/help - помощь и полный список команд\n"
             "/catalog - каталог статей\n"
-            "/authors - авторы"
+            "/authors - список авторов\n"
         )
         await context.bot.sendMessage (
             chat_id=update.effective_chat.id,
@@ -112,40 +115,58 @@ class BotAPI ():
     async def help (update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Показывает полный список команд.'''
         msg = (
-            "Полный список команд:\n"
+            "<b>Полный список команд:</b>\n"
+            "\n"
+            "<b>Меню:</b>\n"
             "/start - запуск бота\n"
             "/help - помощь и полный список команд\n"
             "/catalog - каталог статей\n"
-            "/authors - авторы\n"
-            "/filters - настроить фильтры каталога\n"
+            "/authors - список авторов\n"
+            "\n"
+            "<b>Фильтр:</b>\n"
+            "/filters - показать текущие фильтры каталога\n"
+            "Следующие команды необходимы для добавления/удаления фильтров. Запуск без аргументов (прим. /filterAuthors) - показывает соответствующий список. "
+            "Запуск с аргументами (прим. /filterAuthros misaka) - добавляет/удаляет аргумент из списка соотв. фильтра. Можно записывать несколько аргументов через пробел."
+            "/filterAuthors - добавить/удалить автора\n"
+            "/filterTags - добавить/удалить тег\n"
+            "/filterCountries - добавить/удалить страну\n"
+            "Пустой список фильтров отображает все статьи.\n"
+            "\n"
+            "<b>Статьи и Авторы</b>\n"
             "/article [id] - получить статью по её id\n"
             "/author [id] - получить автора по его id\n"
+            "\n"
+            "<b>Дополнительное:</b>\n"
             "/report [message] - сообщить об ошибке\n"
             "/logs - получить логи своего взаимодействия с ботом\n"
             "/credentials - информация о проекте\n"
-            "/filterAuthors - \n"
-            "/filterTags - \n"
-            "/filterCountries - \n"
-        )
-        await context.bot.sendMessage (
-            chat_id=update.effective_chat.id,
-            text=msg
         )
 
-    async def prepareCatalog (self):
-        '''Подготовка '''
-        pass
+        await context.bot.sendMessage (
+            chat_id=update.effective_chat.id,
+            text=msg,
+            parse_mode='html'
+        )
+
+    async def authors (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Показывает полный список авторов.'''
+        msg = (
+            "Список авторов:\n"
+            f"{prepareAuthors(self.database.getAllAuthors ())}"
+        )
+
+        await context.bot.sendMessage (
+            chat_id=update.effective_chat.id,
+            text=msg,
+            parse_mode='html'
+        )
 
     async def catalog (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Показывает первую страницу каталога.'''
         self.savedCatalog = self.database.createCatalog (self.currentFilters['authors'], self.currentFilters['tags'], self.currentFilters['country'], self.currentFilters['sort'])
         self.currentIter = 0
 
-        keyboard = [
-            [
-                CATALOG_KEYBOARD['time']
-            ]
-        ]
+        keyboard = [[CATALOG_KEYBOARD['time']]]
 
         rightIter = self.currentIter + 10
         if rightIter > len (self.savedCatalog):
@@ -179,13 +200,14 @@ class BotAPI ():
         await update.callback_query.answer()
         self.currentIter -= 10
 
-        if self.currentFilters['sort'] == 'time':
-            keyboard = [[CATALOG_KEYBOARD['time']]]
-        else:
-            keyboard = [[CATALOG_KEYBOARD['views']]]
-
+        keyboard = [[]]
         if self.currentIter > 0:
             keyboard[0].append (CATALOG_KEYBOARD['back'])
+
+        if self.currentFilters['sort'] == 'time':
+            keyboard[0].append (CATALOG_KEYBOARD['time'])
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['views'])
 
         rightIter = self.currentIter + 10
         if rightIter > len (self.savedCatalog):
@@ -215,13 +237,14 @@ class BotAPI ():
         await update.callback_query.answer()
         self.currentIter += 10
 
-        if self.currentFilters['sort'] == 'time':
-            keyboard = [[CATALOG_KEYBOARD['time']]]
-        else:
-            keyboard = [[CATALOG_KEYBOARD['views']]]
-
+        keyboard = [[]]
         if self.currentIter > 0:
             keyboard[0].append (CATALOG_KEYBOARD['back'])
+
+        if self.currentFilters['sort'] == 'time':
+            keyboard[0].append (CATALOG_KEYBOARD['time'])
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['views'])
 
         rightIter = self.currentIter + 10
         if rightIter > len (self.savedCatalog):
@@ -244,6 +267,46 @@ class BotAPI ():
         await update.callback_query.edit_message_text (text=msg, parse_mode='html')
         await update.callback_query.edit_message_reply_markup (reply_markup=reply_markup)
         
+        return 0
+
+    async def catalogSort (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Обрабатывает нажатие на кнопку сортировки у каталога.'''
+        await update.callback_query.answer()
+
+        keyboard = [[]]
+        if self.currentIter > 0:
+            keyboard[0].append (CATALOG_KEYBOARD['back'])
+
+        if self.currentFilters['sort'] == 'time':
+            self.currentFilters['sort'] = 'views'
+            self.savedCatalog = self.database.sortViews (self.savedCatalog)
+            keyboard[0].append (CATALOG_KEYBOARD['views'])
+        else:
+            self.currentFilters['sort'] = 'time'
+            self.savedCatalog = self.database.sortTime (self.savedCatalog)
+            keyboard[0].append (CATALOG_KEYBOARD['time'])
+
+        rightIter = self.currentIter + 10
+        if rightIter > len (self.savedCatalog):
+            rightIter = len (self.savedCatalog)
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['forward'])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        msg = (
+            "<b>Каталог:</b>\n"
+            f"{prepareCatalogPage (self.savedCatalog[self.currentIter:rightIter])}"
+        )
+
+        if self.currentFilters['sort'] == 'time':
+            msg += "<b>Сортировка:</b> по времени"
+        else:
+            msg += "<b>Сортировка:</b> по просмотрам"
+
+        await update.callback_query.edit_message_text (text=msg, parse_mode='html')
+        await update.callback_query.edit_message_reply_markup (reply_markup=reply_markup)
+
         return 0
 
     async def filters (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -288,7 +351,7 @@ class BotAPI ():
         if len (context.args) == 0:
             msg = (
                 "Полный список авторов:\n"
-                f"{prepareListSplit (self.database.getAllAuthors())}"
+                f"{prepareListSplit (self.database.getAllAuthorsID())}"
             )
             await update.effective_message.reply_text (msg)
         else:

@@ -33,3 +33,16 @@ def prepareCatalogPage (articleList):
 
         stringTmp += (tmp + "\n\n")
     return stringTmp
+
+def prepareAuthors (authorList):
+    stringTmp = ""
+
+    for author in authorList:
+        tmp = (
+            f"<b>ID:</b> {author['id']}\n"
+            f"<b>Имя:</b> {author['name']}\n"
+        )
+        print (tmp)
+
+        stringTmp += (tmp + "\n")
+    return stringTmp

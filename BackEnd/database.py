@@ -44,9 +44,16 @@ class Database ():
         authorsList = []
 
         for author in collection.find():
-            authorsList.append (author ["id"])
+            authorsList.append (author)
 
         return authorsList
+
+    def getAllAuthorsID (self):
+        authorsIDList = []
+
+        for author in self.getAllAuthors():
+            authorsIDList.append (author['id'])
+        return authorsIDList
 
     def getAllArticles (self):
         '''Получает список всех статей.'''
@@ -87,10 +94,13 @@ class Database ():
 
         if len (tags) == 0:
             tags = self.getAllTags()
+            tags.append ([])
         if len (country) == 0:
             country = self.getAllCountries()
+            country.append ([])
         if len (authors) == 0:
-            authors = self.getAllAuthors()
+            authors = self.getAllAuthorsID()
+            authors.append ([])
 
         tempCollection = collection.find ({
             'author': {'$in': authors},
@@ -113,4 +123,4 @@ class Database ():
         return sorted (tempArray, key=lambda i: -1 * datetime.datetime.strptime (i['date'], '%d.%m.%y').timestamp())
     
     def sortViews (self, tempArray):
-        return sorted (tempArray, key=lambda i: i['views'])
+        return sorted (tempArray, key=lambda i: -1 * int(i['views']))
