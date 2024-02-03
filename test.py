@@ -1,9 +1,9 @@
 from ProjectSettings.paths import Paths
 from BackEnd.leafFunctions.files import readJson
 
-from BackEnd.database import Database
+# from BackEnd.database import Database
 
-db = Database ()
+# db = Database ()
 
 # listdict = [
 #     {'id': 1, 'views': 24},
@@ -14,9 +14,9 @@ db = Database ()
 # print (sorted (listdict, key=lambda i: i['views']))
 
 
-# from FrontEnd.botAPI import BotAPI
+from FrontEnd.botAPI import BotAPI
 
-# BotAPI ()
+BotAPI ()
 
 # boolean = False
 

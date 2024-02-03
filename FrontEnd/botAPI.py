@@ -11,14 +11,13 @@ from telegram.ext import (
 
 from ProjectSettings.paths import Paths
 from BackEnd.leafFunctions.files import readJson
-from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, prepareListSplit
+from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, prepareListSplit, prepareCatalogPage
 from BackEnd.database import Database
 from BackEnd.telegraph import createTelegraph
 
 CATALOG_KEYBOARD = {
     'back': InlineKeyboardButton ('Назад', callback_data='back'),
     'forward': InlineKeyboardButton ('Вперёд', callback_data='forward'),
-    'none': InlineKeyboardButton ('.', callback_data='none'),
     'views': InlineKeyboardButton ('Просмотры', callback_data='views'),
     'time': InlineKeyboardButton ('Время', callback_data='time')
 }
@@ -45,7 +44,6 @@ class BotAPI ():
             states={
                 0: [
                     CallbackQueryHandler (self.catalogBack, pattern="^" + "back" + "$"),
-                    CallbackQueryHandler (self.catalogSort, pattern="^" + "sort" + "$"),
                     CallbackQueryHandler (self.catalogForward, pattern="^" + "forward" + "$")
                 ]
             },
@@ -134,27 +132,33 @@ class BotAPI ():
             text=msg
         )
 
+    async def prepareCatalog (self):
+        '''Подготовка '''
+        pass
+
     async def catalog (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Показывает первую страницу каталога.'''
-        self.savedCatalog = self.database (self.currentFilters['authors'], self.currentFilters['tags'], self.currentFilters['country'], self.currentFilters['sort'])
+        self.savedCatalog = self.database.createCatalog (self.currentFilters['authors'], self.currentFilters['tags'], self.currentFilters['country'], self.currentFilters['sort'])
+        self.currentIter = 0
 
         keyboard = [
             [
-                CATALOG_KEYBOARD['none'],
-                CATALOG_KEYBOARD['time'],
-                CATALOG_KEYBOARD['forward']
+                CATALOG_KEYBOARD['time']
             ]
         ]
 
-        #Проверка на последнюю и первую страницу, проверка на сортировку
+        rightIter = self.currentIter + 10
+        if rightIter > len (self.savedCatalog):
+            rightIter = len (self.savedCatalog)
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['forward'])
+
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         msg = (
             "<b>Каталог:</b>\n"
+            f"{prepareCatalogPage (self.savedCatalog[self.currentIter:rightIter])}"
         )
-
-        
-
 
         if self.currentFilters['sort'] == 'time':
             msg += "<b>Сортировка:</b> по времени"
@@ -173,34 +177,73 @@ class BotAPI ():
     async def catalogBack (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Реагирует на кнопку каталога "Назад"'''
         await update.callback_query.answer()
+        self.currentIter -= 10
 
-        await context.bot.sendMessage (
-            chat_id=update.effective_chat.id,
-            text="Назад."
+        if self.currentFilters['sort'] == 'time':
+            keyboard = [[CATALOG_KEYBOARD['time']]]
+        else:
+            keyboard = [[CATALOG_KEYBOARD['views']]]
+
+        if self.currentIter > 0:
+            keyboard[0].append (CATALOG_KEYBOARD['back'])
+
+        rightIter = self.currentIter + 10
+        if rightIter > len (self.savedCatalog):
+            rightIter = len (self.savedCatalog)
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['forward'])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        msg = (
+            "<b>Каталог:</b>\n"
+            f"{prepareCatalogPage (self.savedCatalog[self.currentIter:rightIter])}"
         )
+
+        if self.currentFilters['sort'] == 'time':
+            msg += "<b>Сортировка:</b> по времени"
+        else:
+            msg += "<b>Сортировка:</b> по просмотрам"
+
+        await update.callback_query.edit_message_text (text=msg, parse_mode='html')
+        await update.callback_query.edit_message_reply_markup (reply_markup=reply_markup)
+
         return 0
 
     async def catalogForward (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Реагирует на кнопку каталога "Вперёд"'''
         await update.callback_query.answer()
+        self.currentIter += 10
 
-        await context.bot.sendMessage (
-            chat_id=update.effective_chat.id,
-            text="Вперед."
+        if self.currentFilters['sort'] == 'time':
+            keyboard = [[CATALOG_KEYBOARD['time']]]
+        else:
+            keyboard = [[CATALOG_KEYBOARD['views']]]
+
+        if self.currentIter > 0:
+            keyboard[0].append (CATALOG_KEYBOARD['back'])
+
+        rightIter = self.currentIter + 10
+        if rightIter > len (self.savedCatalog):
+            rightIter = len (self.savedCatalog)
+        else:
+            keyboard[0].append (CATALOG_KEYBOARD['forward'])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        msg = (
+            "<b>Каталог:</b>\n"
+            f"{prepareCatalogPage (self.savedCatalog[self.currentIter:rightIter])}"
         )
-        return 0
 
-    async def catalogSort (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        '''Реагирует на кнопку сортировки каталога'''
-        await update.callback_query.answer()
+        if self.currentFilters['sort'] == 'time':
+            msg += "<b>Сортировка:</b> по времени"
+        else:
+            msg += "<b>Сортировка:</b> по просмотрам"
 
-        # await context.bot.sendMessage (
-        #     chat_id=update.effective_chat.id,
-        #     text="Сортировка."
-        # )
-        await update.callback_query.edit_message_text(
-            text="Сортировка."
-        )
+        await update.callback_query.edit_message_text (text=msg, parse_mode='html')
+        await update.callback_query.edit_message_reply_markup (reply_markup=reply_markup)
+        
         return 0
 
     async def filters (self, update: Update, context: ContextTypes.DEFAULT_TYPE):

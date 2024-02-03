@@ -103,8 +103,14 @@ class Database ():
             tempArray.append (article)
 
         if sorting == "views":
-            tempArray = sorted (tempArray, key=lambda i: i['views'])
+            tempArray = self.sortViews (tempArray)
         if sorting == "time":
-            tempArray = sorted (tempArray, key=lambda i: -1 * datetime.datetime.strptime (i['date'], '%d.%m.%y').timestamp())
+            tempArray = self.sortTime (tempArray)
         
         return tempArray
+    
+    def sortTime (self, tempArray):
+        return sorted (tempArray, key=lambda i: -1 * datetime.datetime.strptime (i['date'], '%d.%m.%y').timestamp())
+    
+    def sortViews (self, tempArray):
+        return sorted (tempArray, key=lambda i: i['views'])
