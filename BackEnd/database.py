@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+import datetime
 
 from BackEnd.leafFunctions.files import readJson
 from ProjectSettings.paths import Paths
@@ -43,7 +44,7 @@ class Database ():
         authorsList = []
 
         for author in collection.find():
-            authorsList.append (author ["name"])
+            authorsList.append (author ["id"])
 
         return authorsList
 
@@ -80,3 +81,30 @@ class Database ():
                 'views': 1
             }
         }, upsert=False)
+    
+    def createCatalog (self, authors, tags, country, sorting):
+        collection = self.client ["Moonless"]["ArticlesMeta"]
+
+        if len (tags) == 0:
+            tags = self.getAllTags()
+        if len (country) == 0:
+            country = self.getAllCountries()
+        if len (authors) == 0:
+            authors = self.getAllAuthors()
+
+        tempCollection = collection.find ({
+            'author': {'$in': authors},
+            'tags': {'$in': tags},
+            'country': {'$in': country}
+        })
+        tempArray = []
+
+        for article in tempCollection:
+            tempArray.append (article)
+
+        if sorting == "views":
+            tempArray = sorted (tempArray, key=lambda i: i['views'])
+        if sorting == "time":
+            tempArray = sorted (tempArray, key=lambda i: -1 * datetime.datetime.strptime (i['date'], '%d.%m.%y').timestamp())
+        
+        return tempArray

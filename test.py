@@ -1,13 +1,22 @@
 from ProjectSettings.paths import Paths
 from BackEnd.leafFunctions.files import readJson
 
-# from BackEnd.database import Database
+from BackEnd.database import Database
 
-# Database().updateViewsArticle (1)
+db = Database ()
 
-from FrontEnd.botAPI import BotAPI
+# listdict = [
+#     {'id': 1, 'views': 24},
+#     {'id': 2, 'views': 14},
+#     {'id': 3, 'views': 284}
+# ]
 
-BotAPI ()
+# print (sorted (listdict, key=lambda i: i['views']))
+
+
+# from FrontEnd.botAPI import BotAPI
+
+# BotAPI ()
 
 # boolean = False
 

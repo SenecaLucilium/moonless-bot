@@ -15,15 +15,26 @@ from BackEnd.leafFunctions.string import prepareListString, prepareListUrls, pre
 from BackEnd.database import Database
 from BackEnd.telegraph import createTelegraph
 
+CATALOG_KEYBOARD = {
+    'back': InlineKeyboardButton ('Назад', callback_data='back'),
+    'forward': InlineKeyboardButton ('Вперёд', callback_data='forward'),
+    'none': InlineKeyboardButton ('.', callback_data='none'),
+    'views': InlineKeyboardButton ('Просмотры', callback_data='views'),
+    'time': InlineKeyboardButton ('Время', callback_data='time')
+}
+
 class BotAPI ():
     def __init__ (self):
         self.database = Database ()
         self.currentFilters = {
             'authors': [],
             'tags': [],
-            'country': []
+            'country': [],
+            'sort': 'time'
         }
         self.lastArticle = None
+        self.savedCatalog = []
+        self.currentIter = 0
     
         self.application = ApplicationBuilder().token(readJson(Paths.loginJSON)["TelegramAuth"]["token"]).build()
 
@@ -125,12 +136,13 @@ class BotAPI ():
 
     async def catalog (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         '''Показывает первую страницу каталога.'''
+        self.savedCatalog = self.database (self.currentFilters['authors'], self.currentFilters['tags'], self.currentFilters['country'], self.currentFilters['sort'])
 
         keyboard = [
             [
-                InlineKeyboardButton ("Назад", callback_data="back"),
-                InlineKeyboardButton ("Время", callback_data="sort"),
-                InlineKeyboardButton ("Вперёд", callback_data="forward")
+                CATALOG_KEYBOARD['none'],
+                CATALOG_KEYBOARD['time'],
+                CATALOG_KEYBOARD['forward']
             ]
         ]
 
@@ -138,18 +150,22 @@ class BotAPI ():
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         msg = (
-            "Каталог:\n"
+            "<b>Каталог:</b>\n"
         )
-        # Вставка первых результатов каталога
-        msg += (
-            "Сортировка: по времени\n"
-            "Фильтры:"
-        )
+
+        
+
+
+        if self.currentFilters['sort'] == 'time':
+            msg += "<b>Сортировка:</b> по времени"
+        else:
+            msg += "<b>Сортировка:</b> по просмотрам"
 
         await context.bot.sendMessage (
             chat_id=update.effective_chat.id,
             text=msg,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode='html'
         )
 
         return 0
