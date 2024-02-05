@@ -64,6 +64,7 @@ class BotAPI ():
         filterTagsHandler = CommandHandler ('filterTags', self.filterTags)
         filterCountryHandler = CommandHandler ('filterCountry', self.filterCountry)
         reportHandler = CommandHandler ('report', self.report)
+        credentialsHandler = CommandHandler ('credentials', self.credentials)
         uknownHandler = MessageHandler (filters.COMMAND, self.unknown)
 
         self.application.add_handler (startHandler)
@@ -77,6 +78,7 @@ class BotAPI ():
         self.application.add_handler (filterTagsHandler)
         self.application.add_handler (filterCountryHandler)
         self.application.add_handler (reportHandler)
+        self.application.add_handler (credentialsHandler)
         self.application.add_handler (uknownHandler)
 
         self.application.run_polling (allowed_updates=Update.ALL_TYPES)
@@ -140,7 +142,6 @@ class BotAPI ():
             "\n"
             "<b>Дополнительное:</b>\n"
             "/report [message] - сообщить об ошибке\n"
-            "/logs - получить логи своего взаимодействия с ботом\n"
             "/credentials - информация о проекте\n"
         )
 
@@ -543,3 +544,20 @@ class BotAPI ():
         except (IndexError, ValueError) as error:
             print (f"report func error: {error}")
             await update.effective_message.reply_text ("Корректное использование: /report [message].")
+    
+    async def credentials (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Показывает информацию о проекте.'''
+
+        msg=(
+            "<b>Статьи принадлежат тем, кому они принадлежат.</b>\n"
+            "\n"
+            "Создатель Безлуния - @SenecaMoon\n"
+            "Github бота - https://github.com/SenecaLucilium/moonless-bot\n"
+            "Подписывайтесь на канал - https://t.me/moonlessLib"
+        )
+
+        await context.bot.sendMessage (
+            chat_id=update.effective_chat.id,
+            text=msg,
+            parse_mode='html'
+        )
