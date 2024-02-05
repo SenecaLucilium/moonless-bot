@@ -63,6 +63,7 @@ class BotAPI ():
         filterAuthorsHandler = CommandHandler ('filterAuthors', self.filterAuthors)
         filterTagsHandler = CommandHandler ('filterTags', self.filterTags)
         filterCountryHandler = CommandHandler ('filterCountry', self.filterCountry)
+        reportHandler = CommandHandler ('report', self.report)
         uknownHandler = MessageHandler (filters.COMMAND, self.unknown)
 
         self.application.add_handler (startHandler)
@@ -75,6 +76,7 @@ class BotAPI ():
         self.application.add_handler (filterAuthorsHandler)
         self.application.add_handler (filterTagsHandler)
         self.application.add_handler (filterCountryHandler)
+        self.application.add_handler (reportHandler)
         self.application.add_handler (uknownHandler)
 
         self.application.run_polling (allowed_updates=Update.ALL_TYPES)
@@ -518,3 +520,26 @@ class BotAPI ():
         except Exception as error:
             print (f"telegraph func error: {error}")
             await update.effective_chat.reply_text ("Произошла ошибка.")
+
+    async def report (self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        '''Отправляет репорт юзера админу.'''
+
+        try:
+            if len (context.args) < 0:
+                raise ValueError
+            
+            reportMessage = " ".join (context.args)
+
+            await context.bot.sendMessage (
+                chat_id=readJson(Paths.loginJSON)["TelegramAuth"]["admin_id"],
+                text=f"Вам пришел репорт от юзера:\n{reportMessage}"
+            )
+
+            await context.bot.sendMessage (
+                chat_id=update.effective_chat.id,
+                text="Репорт отправлен."
+            )
+
+        except (IndexError, ValueError) as error:
+            print (f"report func error: {error}")
+            await update.effective_message.reply_text ("Корректное использование: /report [message].")
