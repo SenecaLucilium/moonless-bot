@@ -26,9 +26,9 @@ def prepareCatalogPage (articleList):
 
     for article in articleList:
         tmp = (
-            f"<b>Название:</b> {article['name']}\n"
+            f"📚<b>Название:</b> {article['name']}\n"
             f"Автор: {article['realName']}\n"
-            f"<b>ID:</b> {article['id']} | <b>Дата:</b> {article['date']} | <b>Просмотры:</b> {article['views']}"
+            f"<b>ID:</b> {article['id']} | <b>⏳:</b> {article['date']} | <b>👁:</b> {article['views']}"
         )
 
         stringTmp += (tmp + "\n\n")
@@ -39,10 +39,9 @@ def prepareAuthors (authorList):
 
     for author in authorList:
         tmp = (
-            f"<b>ID:</b> {author['id']}\n"
+            f"✍️<b>ID:</b> {author['id']}\n"
             f"<b>Имя:</b> {author['name']}\n"
         )
-        print (tmp)
 
         stringTmp += (tmp + "\n")
     return stringTmp

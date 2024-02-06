@@ -16,10 +16,10 @@ from BackEnd.database import Database
 from BackEnd.telegraph import createTelegraph
 
 CATALOG_KEYBOARD = {
-    'back': InlineKeyboardButton ('Назад', callback_data='back'),
-    'forward': InlineKeyboardButton ('Вперёд', callback_data='forward'),
-    'views': InlineKeyboardButton ('Просмотры', callback_data='sort'),
-    'time': InlineKeyboardButton ('Время', callback_data='sort')
+    'back': InlineKeyboardButton ('⬅️', callback_data='back'),
+    'forward': InlineKeyboardButton ('➡️', callback_data='forward'),
+    'views': InlineKeyboardButton ('👁', callback_data='sort'),
+    'time': InlineKeyboardButton ('⏳', callback_data='sort')
 }
 
 class BotAPI ():
@@ -103,7 +103,7 @@ class BotAPI ():
             "\n"
             "Бот возвращает статьи в телеграфах (telegra.ph).\n"
             "\n"
-            "<b>Основные команды:</b>\n"
+            "⚙️<b>Основные команды:</b>\n"
             "/start - запуск бота\n"
             "/help - помощь и полный список команд\n"
             "/catalog - каталог статей\n"
@@ -121,13 +121,13 @@ class BotAPI ():
         msg = (
             "<b>Полный список команд:</b>\n"
             "\n"
-            "<b>Меню:</b>\n"
+            "⚙️<b>Меню:</b>\n"
             "/start - запуск бота\n"
             "/help - помощь и полный список команд\n"
             "/catalog - каталог статей\n"
             "/authors - список авторов\n"
             "\n"
-            "<b>Фильтр:</b>\n"
+            "🔍<b>Фильтр:</b>\n"
             "/filters - показать текущие фильтры каталога\n"
             "Следующие команды необходимы для добавления/удаления фильтров. Запуск без аргументов (прим. /filterAuthors) - показывает соответствующий список. "
             "Запуск с аргументами (прим. /filterAuthros misaka) - добавляет/удаляет аргумент из списка соотв. фильтра. Можно записывать несколько аргументов через пробел."
@@ -136,11 +136,11 @@ class BotAPI ():
             "/filterCountries - добавить/удалить страну\n"
             "Пустой список фильтров отображает все статьи.\n"
             "\n"
-            "<b>Статьи и Авторы</b>\n"
+            "📚<b>Статьи и Авторы</b>\n"
             "/article [id] - получить статью по её id\n"
             "/author [id] - получить автора по его id\n"
             "\n"
-            "<b>Дополнительное:</b>\n"
+            "📣<b>Дополнительное:</b>\n"
             "/report [message] - сообщить об ошибке\n"
             "/credentials - информация о проекте\n"
         )
@@ -367,8 +367,15 @@ class BotAPI ():
                 else:
                     added_args.append (arg)
             
+            tempArgs = []
+            for arg in added_args:
+                if arg in self.currentFilters['authors']:
+                    self.currentFilters['authors'].remove (arg)
+                else:
+                    tempArgs.append (arg)
+            
             tempSet = set(self.currentFilters['authors'])
-            tempSet.update (added_args)
+            tempSet.update (tempArgs)
             self.currentFilters['authors'] = list (tempSet)
 
             msg = (
@@ -396,8 +403,15 @@ class BotAPI ():
                 else:
                     added_args.append (arg)
             
+            tempArgs = []
+            for arg in added_args:
+                if arg in self.currentFilters['tags']:
+                    self.currentFilters['tags'].remove (arg)
+                else:
+                    tempArgs.append (arg)
+            
             tempSet = set(self.currentFilters['tags'])
-            tempSet.update (added_args)
+            tempSet.update (tempArgs)
             self.currentFilters['tags'] = list (tempSet)
 
             msg = (
@@ -425,8 +439,15 @@ class BotAPI ():
                 else:
                     added_args.append (arg)
             
+            tempArgs = []
+            for arg in added_args:
+                if arg in self.currentFilters['country']:
+                    self.currentFilters['country'].remove (arg)
+                else:
+                    tempArgs.append (arg)
+                
             tempSet = set(self.currentFilters['country'])
-            tempSet.update (added_args)
+            tempSet.update (tempArgs)
             self.currentFilters['country'] = list (tempSet)
 
             msg = (
@@ -448,9 +469,9 @@ class BotAPI ():
 
             msg = (
                 f"<b>ID:</b> {authorInfo['id']}\n"
-                f"<b>Имя:</b> {authorInfo['name']}\n"
-                f"<b>Основной ресурс:</b> {authorInfo['mainLink']}\n"
-                f"<b>Доп. ресурс:</b> {authorInfo['otherLink']}\n"
+                f"✍️<b>Имя:</b> {authorInfo['name']}\n\n"
+                f"🔗<b>Основной ресурс:</b> {authorInfo['mainLink']}\n"
+                f"🔗<b>Доп. ресурс:</b> {authorInfo['otherLink']}\n"
             )
             await update.effective_message.reply_text (msg, parse_mode='html')
 
@@ -476,12 +497,12 @@ class BotAPI ():
             self.lastArticle = articleInfo['id']
             msg = (
                 f"<b>ID:</b> {articleInfo['id']}\n"
-                f"<b>Название:</b> {articleInfo['name']}\n\n"
-                f"<b>Автор:</b> {articleInfo['realName']}\n"
+                f"📚<b>Название:</b> {articleInfo['name']}\n\n"
+                f"✍️<b>Автор:</b> {articleInfo['realName']}\n\n"
                 f"<b>Теги:</b> {prepareListString (articleInfo['tags'])}\n"
                 f"<b>Страны:</b> {prepareListString (articleInfo['country'])}\n\n"
-                f"<b>Дата:</b> {articleInfo['date']}\n"
-                f"<b>Просмотры:</b> {articleInfo['views']}\n"
+                f"<b>⏳:</b> {articleInfo['date']}\n"
+                f"<b>👁:</b> {articleInfo['views']}\n"
             )
 
             keyboard = [
